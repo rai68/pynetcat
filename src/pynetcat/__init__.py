@@ -18,16 +18,18 @@ class pynetcat:
             self.ipv = socket.AF_INET
         elif options.get("ipv") == 6:
             self.ipv = socket.AF_INET6
+
+    def connect(self, host,port):
+        #connect to host and port + init the socket assuming mode is client
+        # returns true if sucessful or error if failed
+        
         try:
             self.logger(f'Creating socket for netcat',1)
             self.socket = socket.socket(self.ipv, socket.SOCK_STREAM)
             self.socket.settimeout(self.timeout)
         except Exception as e:
             return e
-
-    def connect(self, host,port):
-        #connect to host and port + init the socket assuming mode is client
-        # returns true if sucessful or error if failed
+        
         try:
             self.logger(f"Connecting to socket at {host}:{port}",1)
             self.host = host
@@ -39,7 +41,7 @@ class pynetcat:
             self.logger(f"An error coccured while connecting to the socket: {e}",2)
             return e
 
-    def send(self, message):
+    def send(self, message = ""):
         if type(message) != bytes:
             self.logger("Passed 'message' must be a bytes object",2)
             return Exception("Passed 'message' must be a bytes object")
@@ -62,7 +64,7 @@ class pynetcat:
             return e
 
     def receive(self, size = 8192):
-        if size < self.buffmax:
+        if size > self.buffmax:
             self.logger(f"Size is greater than max ({self.buffmax})",2)
             return Exception(f"Size is greater than max ({self.buffmax})")
         size = self.buffmax
@@ -70,7 +72,7 @@ class pynetcat:
         return self.buffer
 
     def receiveUntil(self,until,size = 8192,keep = True):
-        if size < self.buffmax:
+        if size > self.buffmax:
             self.logger(f"Size is greater than max ({self.buffmax})",2)
             return Exception(f"Size is greater than max ({self.buffmax})")
         if type(until) != bytes:
@@ -88,6 +90,13 @@ class pynetcat:
             return buff
         except Exception as e:
             self.logger(f"Failed to receive until: {e}",2)
+            return e
+            
+    def sendlineafter(self, until, data, keep = True):
+        
+        res = self.recvuntil(until)
+        self.sendLine(data)
+        return res
 
     def close(self):
         self.logger("Closing connection on socket",1)
@@ -104,29 +113,27 @@ class pynetcat:
             
             
             
-            
-from pynetcat import pynetcat
-import sys
-from threading import Thread
-nc = pynetcat({'timeout':500,'loglevel':0})
-print("--------------------------------------------------------------------")
-print("pyNetcat CLI - a Python based netcat utility that works on windows")
-print("Import pynetcat from this file for a module based utility.")
-print("--------------------------------------------------------------------")
+if __name__ == "__main__":
+    from threading import Thread
+    nc = pynetcat({'timeout':500,'loglevel':0})
+    print("--------------------------------------------------------------------")
+    print("pyNetcat CLI - a Python based netcat utility that works on windows")
+    print("Import pynetcat from this file for a module based utility.")
+    print("--------------------------------------------------------------------")
 
-host = input("Hostname: ")
-port = int(input("Port: "))
+    host = input("Hostname: ")
+    port = int(input("Port: "))
 
-nc.connect(host,port)
+    nc.connect(host,port)
 
-def loop():
+    def loop():
+        while(1):
+            line = nc.receive(8192).decode()
+            if len(line) != 0:
+                print(line,end="")
+    t1 = Thread(target=loop)
+    t1.daemon = True
+    t1.start()
+
     while(1):
-        line = nc.receive(8192).decode()
-        if len(line) != 0:
-            print(line,end="")
-t1 = Thread(target=loop)
-t1.daemon = True
-t1.start()
-
-while(1):
-    nc.sendLine(input().encode(nc.encoding))
+        nc.sendLine(input().encode(nc.encoding))
